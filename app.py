@@ -1,80 +1,45 @@
-from flask import Flask, request, jsonify, render_template_string
+import streamlit as st
 from openai import OpenAI
 
-# Initialize OpenAI client
+# 🔑 Add your OpenAI API Key here
 client = OpenAI(api_key="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")
 
-app = Flask(__name__)
+# Page config
+st.set_page_config(page_title="AI Chatbot", page_icon="🤖")
 
-# HTML + JS (frontend in same file)
-HTML_PAGE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Chatbot</title>
-    <style>
-        body { font-family: Arial; background: #f4f4f4; }
-        #chatbox { width: 400px; margin: 50px auto; background: white; padding: 20px; border-radius: 10px; }
-        #messages { height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
-        input { width: 75%; padding: 10px; }
-        button { padding: 10px; }
-        .user { color: blue; }
-        .bot { color: green; }
-    </style>
-</head>
-<body>
+# Title
+st.title("🤖 AI Chatbot")
+st.write("Ask anything and get smart answers!")
 
-<div id="chatbox">
-    <h2>Chatbot</h2>
-    <div id="messages"></div>
-    <input id="input" placeholder="Type a message..." />
-    <button onclick="sendMessage()">Send</button>
-</div>
+# Initialize chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-<script>
-async function sendMessage() {
-    let input = document.getElementById("input");
-    let message = input.value;
-    if (!message) return;
+# Display previous messages
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-    let messagesDiv = document.getElementById("messages");
+# User input
+user_input = st.chat_input("Type your message...")
 
-    messagesDiv.innerHTML += "<div class='user'><b>You:</b> " + message + "</div>";
+if user_input:
+    # Store user message
+    st.session_state.messages.append({"role": "user", "content": user_input})
 
-    input.value = "";
+    # Display user message
+    with st.chat_message("user"):
+        st.markdown(user_input)
 
-    let response = await fetch("/chat", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({message: message})
-    });
+    # Get AI response
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            response = client.responses.create(
+                model="gpt-4.1-mini",
+                input=user_input
+            )
+            reply = response.output[0].content[0].text
+            st.markdown(reply)
 
-    let data = await response.json();
-
-    messagesDiv.innerHTML += "<div class='bot'><b>Bot:</b> " + data.reply + "</div>";
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-}
-</script>
-
-</body>
-</html>
-"""
-
-@app.route("/")
-def home():
-    return render_template_string(HTML_PAGE)
-
-@app.route("/chat", methods=["POST"])
-def chat():
-    user_message = request.json.get("message")
-
-    response = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[{"role": "user", "content": user_message}]
-    )
-
-    reply = response.choices[0].message.content
-    return jsonify({"reply": reply})
-
-if __name__ == "__main__":
-    app.run(debug=True)
+    # Store AI response
+    st.session_state.messages.append({"role": "assistant", "content": reply})
